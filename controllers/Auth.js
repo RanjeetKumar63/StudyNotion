@@ -190,7 +190,7 @@ exports.login = async (req, res) => {
       const payload = {
         email: user.email,
         id: user._id,
-        role: user.role,
+        accountType: user.accountType,
       };
       const token = jwt.sign(payload, process.env.JWT_SECRET, {
         expiresIn: "2h",
@@ -226,14 +226,61 @@ exports.login = async (req, res) => {
 
 // changed Password
 exports.changePassword = async (req, res) => {
-  try {
-    // get data from req body
-    const { email, password } = req.body;
+  // try {
+  // get data from req body
+  // const { email, password } = req.body;
 
-    // get oldpassword,newpassword,confirmPassword
-    // validation
-    // update password in DB
-    // send mail - password update
+  // get oldpassword,newpassword,confirmPassword
+  // validation
+  // update password in DB
+  // send mail - password update
+  // return response
+  // } catch (error) {}
+  try {
+    // data fetch
+    const { password, confirmPassword, token } = req.body;
+
+    //validation
+    if (password !== confirmPassword) {
+      return res.json({
+        success: false,
+        message: "Password is not matching",
+      });
+    }
+    // get userdetails from db using token
+    const userDetails = await user.findOne({ token: token });
+    // if no entry - invalid token
+    if (!userDetails) {
+      return res.json({
+        success: false,
+        message: "Token is invalid",
+      });
+    }
+    // token time check
+    if (userDetails.resetPasswordExpires < Date.now()) {
+      return res.json({
+        success: false,
+        message: "Token is expired, please regenerate your token ",
+      });
+    }
+    // hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+    // password update
+    await User.findOneAndUpdate(
+      { token: token },
+      { password: hashedPassword },
+      { new: true }
+    );
     // return response
-  } catch (error) {}
+    return res.status(200).json({
+      success: true,
+      message: "Password reset successful",
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong,while sending reset mail",
+    });
+  }
 };
